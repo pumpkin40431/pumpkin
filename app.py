@@ -137,7 +137,7 @@ def generate_post(style, topic, extra_info):
 # ===== 爬取熱門文案 =====
 def scrape_viral_posts(platform, keyword):
     try:
-        apify_token = os.environ.get("APIFY_TOKEN")
+        apify_token = os.environ.get("APIFY_API_TOKEN")
         if not apify_token:
             return "❌ 找不到 Apify Token，請確認 Secrets 設定"
         
