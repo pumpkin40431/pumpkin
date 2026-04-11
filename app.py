@@ -47,11 +47,11 @@ def scrape_threads(keywords: str, search_filter: str, max_posts: int):
     run_url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/runs"
     
     payload = {
-        "queries": keyword_list,
-        "searchType": search_filter,
-        "maxPostsPerQuery": max_posts,
-        "scrapePostReplies": False
-    }
+    "mode": "search",
+    "keywords": keyword_list,
+    "search_filter": search_filter,
+    "max_posts": max_posts
+}
     
     headers = {
         "Content-Type": "application/json"
