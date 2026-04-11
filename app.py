@@ -32,8 +32,8 @@ def save_to_history(post_type, content, platform="threads"):
 # ===== 發送通知 =====
 def send_email_notification(content, post_type):
     try:
-        email = os.environ.get("EMAIL_ADDRESS")
-        password = os.environ.get("EMAIL_PASSWORD")
+        email = os.environ.get("GMAIL_ADDRESS")
+        password = os.environ.get("GMAIL_APP_PASSWORD")
         notify = os.environ.get("NOTIFY_EMAIL")
         
         if not all([email, password, notify]):
@@ -243,7 +243,7 @@ def show_history():
     return output
 
 # ===== 建立介面 =====
-with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app:
+with gr.Blocks(title="Viral Threads Post Engine") as app:
     
     gr.Markdown("# 🔥 Viral Threads Post Engine")
     gr.Markdown("眼鏡店專用｜20-40歲客群｜誠實老闆人設")
@@ -276,8 +276,7 @@ with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app
                 with gr.Column():
                     output_text = gr.Textbox(
                         label="生成結果",
-                        lines=15,
-                        show_copy_button=True
+                        lines=15
                     )
             
             generate_btn.click(
@@ -307,8 +306,7 @@ with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app
                 with gr.Column():
                     scrape_output = gr.Textbox(
                         label="爬取結果",
-                        lines=20,
-                        show_copy_button=True
+                        lines=20
                     )
             
             scrape_btn.click(
@@ -333,8 +331,7 @@ with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app
                 with gr.Column():
                     analyze_output = gr.Textbox(
                         label="分析結果",
-                        lines=15,
-                        show_copy_button=True
+                        lines=15
                     )
             
             analyze_btn.click(
@@ -350,8 +347,7 @@ with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app
             refresh_btn = gr.Button("🔄 更新記錄")
             history_output = gr.Textbox(
                 label="歷史記錄",
-                lines=20,
-                show_copy_button=True
+                lines=20
             )
             
             refresh_btn.click(
@@ -359,7 +355,12 @@ with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app
                 outputs=history_output
             )
 
-app.launch(
-    server_name="0.0.0.0",
-    server_port=int(os.environ.get("PORT", 7860))
-)
+# ===== 啟動 =====
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7860))
+    app.launch(
+        server_name="0.0.0.0",
+        server_port=port,
+        theme=gr.themes.Soft()
+    )
+
