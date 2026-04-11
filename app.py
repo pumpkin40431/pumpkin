@@ -110,7 +110,13 @@ def scrape_threads(keywords: str, search_filter: str, max_posts: int):
         if not items:
             return None, "❌ 爬取結果為空，請換關鍵字試試"
         
+        # 暫時 debug 用
+        print("=== RAW DATA SAMPLE ===")
+        print(json.dumps(items[0], ensure_ascii=False, indent=2))
+        print("=== END RAW DATA ===")
+        
         return items, f"✅ 成功爬取 {len(items)} 篇貼文"
+
         
     except Exception as e:
         return None, f"❌ 取得結果失敗：{str(e)}"
