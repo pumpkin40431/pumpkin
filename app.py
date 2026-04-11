@@ -43,33 +43,32 @@ def scrape_threads(keywords: str, search_filter: str, max_posts: int):
     if not keyword_list:
         return None, "❌ 請輸入關鍵字"
 
-    # 啟動 Actor
     run_url = f"https://api.apify.com/v2/acts/{ACTOR_ID}/runs"
-    
+
     payload = {
-    "mode": "search",
-    "keywords": keyword_list,
-    "search_filter": search_filter,
-    "max_posts": max_posts
-}
-    
+        "mode": "search",
+        "keywords": keyword_list,
+        "search_filter": search_filter,
+        "max_posts": max_posts
+    }
+
     headers = {
         "Content-Type": "application/json"
     }
-    
+
     params = {
         "token": APIFY_API_TOKEN
     }
 
     try:
         resp = requests.post(run_url, json=payload, headers=headers, params=params, timeout=30)
-        
+
         if resp.status_code != 201:
             return None, f"❌ 啟動失敗：HTTP {resp.status_code}\n{resp.text[:500]}"
-        
+
         run_data = resp.json()
         run_id = run_data.get("data", {}).get("id")
-        
+
         if not run_id:
             return None, f"❌ 無法取得 Run ID\n{resp.text[:300]}"
 
@@ -78,19 +77,19 @@ def scrape_threads(keywords: str, search_filter: str, max_posts: int):
 
     # 輪詢等待完成
     status_url = f"https://api.apify.com/v2/actor-runs/{run_id}"
-    
-    for attempt in range(60):  # 最多等 5 分鐘
+
+    for attempt in range(60):
         time.sleep(5)
         try:
             status_resp = requests.get(status_url, params=params, timeout=15)
             status_data = status_resp.json()
             status = status_data.get("data", {}).get("status", "")
-            
+
             if status == "SUCCEEDED":
                 break
             elif status in ["FAILED", "ABORTED", "TIMED-OUT"]:
                 return None, f"❌ Actor 執行失敗，狀態：{status}"
-                
+
         except Exception as e:
             continue
     else:
@@ -100,24 +99,18 @@ def scrape_threads(keywords: str, search_filter: str, max_posts: int):
     dataset_id = status_data.get("data", {}).get("defaultDatasetId")
     if not dataset_id:
         return None, "❌ 無法取得 Dataset ID"
-    
+
     result_url = f"https://api.apify.com/v2/datasets/{dataset_id}/items"
-    
+
     try:
         result_resp = requests.get(result_url, params={**params, "limit": max_posts}, timeout=30)
         items = result_resp.json()
-        
+
         if not items:
             return None, "❌ 爬取結果為空，請換關鍵字試試"
-        
-        # 暫時 debug 用
-        print("=== RAW DATA SAMPLE ===")
-        print(json.dumps(items[0], ensure_ascii=False, indent=2))
-        print("=== END RAW DATA ===")
-        
+
         return items, f"✅ 成功爬取 {len(items)} 篇貼文"
 
-        
     except Exception as e:
         return None, f"❌ 取得結果失敗：{str(e)}"
 
@@ -125,11 +118,11 @@ def scrape_threads(keywords: str, search_filter: str, max_posts: int):
 # 計算互動分數
 # ============================================================
 def calc_engagement(post):
-    likes = post.get("likes", post.get("likeCount", 0)) or 0
-    replies = post.get("replies", post.get("replyCount", 0)) or 0
-    reposts = post.get("reposts", post.get("repostCount", 0)) or 0
-    quotes = post.get("quotes", post.get("quoteCount", 0)) or 0
-    shares = post.get("shares", post.get("shareCount", 0)) or 0
+    likes = post.get("like_count", 0) or 0
+    replies = post.get("reply_count", 0) or 0
+    reposts = post.get("repost_count", 0) or 0
+    quotes = post.get("quote_count", 0) or 0
+    shares = post.get("share_count", 0) or 0
     return likes * 1 + replies * 3 + reposts * 5 + quotes * 4 + shares * 4
 
 # ============================================================
@@ -138,20 +131,19 @@ def calc_engagement(post):
 def analyze_posts(posts: list):
     if not ANTHROPIC_API_KEY:
         return "❌ 未設定 ANTHROPIC_API_KEY"
-    
-    # 取前 5 名高互動貼文
+
     sorted_posts = sorted(posts, key=calc_engagement, reverse=True)[:5]
-    
+
     post_texts = []
     for i, p in enumerate(sorted_posts, 1):
-        text = p.get("text", p.get("content", p.get("caption", "")))
-        likes = p.get("likes", p.get("likeCount", 0)) or 0
-        replies = p.get("replies", p.get("replyCount", 0)) or 0
+        text = p.get("text_content", "")
+        likes = p.get("like_count", 0) or 0
+        replies = p.get("reply_count", 0) or 0
         score = calc_engagement(p)
         post_texts.append(f"【貼文{i}】互動分數:{score} 讚:{likes} 留言:{replies}\n{text}")
-    
+
     combined = "\n\n---\n\n".join(post_texts)
-    
+
     prompt = f"""你是社群媒體病毒式傳播專家。分析以下 Threads 高互動貼文，找出共同的爆紅模式。
 
 {combined}
@@ -182,7 +174,7 @@ def analyze_posts(posts: list):
 def generate_posts(analysis: str, brand_name: str, brand_desc: str, product: str, target: str):
     if not ANTHROPIC_API_KEY:
         return "❌ 未設定 ANTHROPIC_API_KEY"
-    
+
     prompt = f"""你是台灣眼鏡店的社群媒體專家，擅長寫 Threads 爆文。
 
 品牌資訊：
@@ -230,25 +222,25 @@ def generate_posts(analysis: str, brand_name: str, brand_desc: str, product: str
 def format_scrape_results(posts: list):
     if not posts:
         return ""
-    
+
     sorted_posts = sorted(posts, key=calc_engagement, reverse=True)[:10]
     lines = [f"📊 共爬取 {len(posts)} 篇，顯示前 10 名高互動貼文\n"]
-    
+
     for i, p in enumerate(sorted_posts, 1):
-        text = p.get("text", p.get("content", p.get("caption", "")))
-        likes = p.get("likes", p.get("likeCount", 0)) or 0
-        replies = p.get("replies", p.get("replyCount", 0)) or 0
-        reposts = p.get("reposts", p.get("repostCount", 0)) or 0
+        text = p.get("text_content", "")
+        likes = p.get("like_count", 0) or 0
+        replies = p.get("reply_count", 0) or 0
+        reposts = p.get("repost_count", 0) or 0
         score = calc_engagement(p)
-        username = p.get("username", p.get("authorName", p.get("ownerUsername", "unknown")))
-        
+        username = p.get("username", "unknown")
+
         preview = text[:150] + "..." if len(text) > 150 else text
         lines.append(
             f"{'='*40}\n"
             f"#{i} @{username} | 分數:{score} | 讚:{likes} 留言:{replies} 轉:{reposts}\n"
             f"{preview}\n"
         )
-    
+
     return "\n".join(lines)
 
 # ============================================================
@@ -256,23 +248,22 @@ def format_scrape_results(posts: list):
 # ============================================================
 def build_ui():
     with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app:
-        
+
         gr.Markdown("# 🧵 Viral Threads Post Engine\n### 台灣眼鏡店爆文生成器")
-        
-        # 儲存爬取資料的狀態
+
         scraped_data = gr.State([])
         analysis_data = gr.State("")
-        
+
         # ── Step 1：爬取設定 ──────────────────────────────
         with gr.Group():
             gr.Markdown("## Step 1：設定爬取條件")
-            
+
             keywords_input = gr.Textbox(
                 label="關鍵字（多個用逗號分隔）",
                 placeholder="眼鏡, 配眼鏡, 近視, 眼鏡推薦",
                 value="眼鏡, 配眼鏡"
             )
-            
+
             with gr.Row():
                 filter_input = gr.Radio(
                     label="搜尋類型",
@@ -286,10 +277,10 @@ def build_ui():
                     value=20,
                     step=5
                 )
-            
+
             scrape_btn = gr.Button("🔍 開始爬取", variant="primary", size="lg")
             scrape_status = gr.Textbox(label="爬取狀態", interactive=False, lines=2)
-        
+
         # ── Step 2：爬取結果 ──────────────────────────────
         with gr.Group():
             gr.Markdown("## Step 2：爬取結果")
@@ -300,7 +291,7 @@ def build_ui():
                 max_lines=20
             )
             analyze_btn = gr.Button("📊 分析爆紅模式", variant="primary", size="lg")
-        
+
         # ── Step 3：病毒分析 ──────────────────────────────
         with gr.Group():
             gr.Markdown("## Step 3：病毒式傳播分析")
@@ -310,11 +301,11 @@ def build_ui():
                 lines=15,
                 max_lines=25
             )
-        
+
         # ── Step 4：品牌設定 ──────────────────────────────
         with gr.Group():
             gr.Markdown("## Step 4：品牌設定")
-            
+
             with gr.Row():
                 brand_name_input = gr.Textbox(
                     label="店名",
@@ -325,7 +316,7 @@ def build_ui():
                     label="主打商品",
                     placeholder="例：日本手工框、散光隱形眼鏡"
                 )
-            
+
             brand_desc_input = gr.Textbox(
                 label="品牌描述",
                 placeholder="例：台北大安區在地眼鏡店，堅持不賣貴就是好的理念",
@@ -336,9 +327,9 @@ def build_ui():
                 placeholder="例：20-35歲上班族，重視CP值，第一次配眼鏡的年輕人",
                 lines=2
             )
-            
+
             generate_btn = gr.Button("✍️ 生成貼文草稿", variant="primary", size="lg")
-        
+
         # ── Step 5：生成結果 ──────────────────────────────
         with gr.Group():
             gr.Markdown("## Step 5：貼文草稿")
@@ -350,7 +341,7 @@ def build_ui():
             )
             save_btn = gr.Button("💾 儲存到歷史記錄", variant="secondary")
             save_status = gr.Textbox(label="儲存狀態", interactive=False, lines=1)
-        
+
         # ── 歷史記錄 ──────────────────────────────────────
         with gr.Accordion("📚 歷史記錄", open=False):
             history_output = gr.Textbox(
@@ -359,11 +350,11 @@ def build_ui():
                 lines=10
             )
             load_history_btn = gr.Button("🔄 載入歷史記錄")
-        
+
         # ============================================================
         # 事件綁定
         # ============================================================
-        
+
         def do_scrape(keywords, search_filter, max_posts):
             posts, status = scrape_threads(keywords, search_filter, int(max_posts))
             if posts:
@@ -371,36 +362,36 @@ def build_ui():
                 return posts, status, display
             else:
                 return [], status, ""
-        
+
         scrape_btn.click(
             fn=do_scrape,
             inputs=[keywords_input, filter_input, max_posts_input],
             outputs=[scraped_data, scrape_status, scrape_results]
         )
-        
+
         def do_analyze(posts):
             if not posts:
                 return "❌ 請先完成爬取", ""
             result = analyze_posts(posts)
             return result, result
-        
+
         analyze_btn.click(
             fn=do_analyze,
             inputs=[scraped_data],
             outputs=[analysis_output, analysis_data]
         )
-        
+
         def do_generate(analysis, brand_name, brand_desc, product, target):
             if not analysis:
                 return "❌ 請先完成分析"
             return generate_posts(analysis, brand_name, brand_desc, product, target)
-        
+
         generate_btn.click(
             fn=do_generate,
             inputs=[analysis_data, brand_name_input, brand_desc_input, product_input, target_input],
             outputs=[generated_output]
         )
-        
+
         def do_save(posts_text):
             if not posts_text:
                 return "❌ 沒有內容可儲存"
@@ -410,13 +401,13 @@ def build_ui():
             }
             save_history([entry])
             return "✅ 已儲存！"
-        
+
         save_btn.click(
             fn=do_save,
             inputs=[generated_output],
             outputs=[save_status]
         )
-        
+
         def do_load_history():
             history = load_history()
             if not history:
@@ -425,12 +416,12 @@ def build_ui():
             for item in reversed(history[-10:]):
                 lines.append(f"[{item.get('timestamp', '')}]\n{item.get('content', '')}\n{'='*50}")
             return "\n\n".join(lines)
-        
+
         load_history_btn.click(
             fn=do_load_history,
             outputs=[history_output]
         )
-    
+
     return app
 
 # ============================================================
@@ -443,4 +434,3 @@ if __name__ == "__main__":
         server_port=int(os.environ.get("PORT", 7860)),
         share=False
     )
-
