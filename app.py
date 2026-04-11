@@ -359,4 +359,7 @@ with gr.Blocks(title="Viral Threads Post Engine", theme=gr.themes.Soft()) as app
                 outputs=history_output
             )
 
-app.launch()
+app.launch(
+    server_name="0.0.0.0",
+    server_port=int(os.environ.get("PORT", 7860))
+)
