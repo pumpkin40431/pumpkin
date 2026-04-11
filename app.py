@@ -11,7 +11,7 @@ from datetime import datetime
 # ============================================================
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN", "")
-ACTOR_ID = "futurizerush/meta-threads-scraper-zh-tw"
+ACTOR_ID = "futurizerush~meta-threads-scraper-zh-tw"
 HISTORY_FILE = "post_history.json"
 
 # ============================================================
@@ -437,3 +437,4 @@ if __name__ == "__main__":
         server_port=int(os.environ.get("PORT", 7860)),
         share=False
     )
+
