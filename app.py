@@ -9,7 +9,7 @@ from datetime import datetime
 # ==================== 設定 ====================
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 APIFY_API_TOKEN = os.environ.get("APIFY_API_TOKEN")
-ACTOR_ID = "burton/threads-search-scraper"
+ACTOR_ID = "burton~threads-search-scraper"
 HISTORY_FILE = "post_history.json"
 
 # ==================== 歷史記錄 ====================
